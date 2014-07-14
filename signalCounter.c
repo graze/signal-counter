@@ -178,11 +178,18 @@ int requestPostCsv(csv)
         
         // specify post data
         curl_easy_setopt(curl, CURLOPT_POSTFIELDS, postString);
+        
+        // send response body to /dev/null
+        FILE *devNull = fopen("/dev/null", "w+");
+        
+        curl_easy_setopt(curl, CURLOPT_WRITEDATA, devNull);
 
         // make the request
         CURLcode res;
         
         res = curl_easy_perform(curl);
+        
+        fclose(devNull);
         
         if(res != CURLE_OK) {
             fprintf(stderr, "curl_easy_perform() failed: %s\n", curl_easy_strerror(res));

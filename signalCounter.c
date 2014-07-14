@@ -38,6 +38,8 @@
 // the count file is moved to here before it is submitted
 #define PATH_SIGNAL_COUNT_SWAP "/tmp/signalCounterCount.swp"
 
+#define PATH_MAC_ADDRESS_ETH0 "/sys/class/net/eth0/address"
+
 // number of seconds to debounce input signal for
 #define DEBOUNCE_INTERVAL_MS 200
 
@@ -124,12 +126,12 @@ int fileMoveCountToSwap(void)
  * read the whole swap file into memory. If this proves too memory hungry, split into smaller chunks
  *
  */
-char * fileGetSwapFileContents(void)
+char * fileGetFileContents(char * fileName)
 {
     char * fileContents;
     long fileSize;
     
-    FILE * swapFile = fopen(PATH_SIGNAL_COUNT_SWAP, "rb");
+    FILE * swapFile = fopen(fileName, "rb");
     
     // figure out how big this file is
     fseek(swapFile, 0, SEEK_END);
@@ -139,20 +141,27 @@ char * fileGetSwapFileContents(void)
     rewind(swapFile);
     
     // allocate enough memory for the contents of the file
-    fileContents = malloc(fileSize * (sizeof(char)));
+    fileContents = malloc((fileSize + 1) * (sizeof(char)));
     
     // load the contents of the file into the fileContents var
     fread(fileContents, sizeof(char), fileSize, swapFile);
     
     fclose(swapFile);
     
+    // null terminate
+    fileContents[fileSize] = 0;
+    
     return fileContents;
 }
 
-char * getMacAddress()
+char * fileGetSwapFileContents(void)
 {
-    // @todo implement this
-    return "fa:ke:ad:dr:es:s0";
+    return fileGetFileContents(PATH_SIGNAL_COUNT_SWAP);
+}
+
+char * fileGetMacAddress(void)
+{
+    return fileGetFileContents(PATH_MAC_ADDRESS_ETH0);
 }
 
 /**
@@ -174,7 +183,7 @@ int requestPostCsv(csv)
         curl_easy_setopt(curl, CURLOPT_URL, END_POINT_URL);
         
         char * postString = NULL;
-        asprintf(&postString, "csv=%s&macAddress=%s", fileGetSwapFileContents(), getMacAddress());
+        asprintf(&postString, "csv=%s&macAddress=%s", fileGetSwapFileContents(), fileGetMacAddress());
         
         // specify post data
         curl_easy_setopt(curl, CURLOPT_POSTFIELDS, postString);

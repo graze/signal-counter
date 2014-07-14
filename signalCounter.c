@@ -120,9 +120,33 @@ int fileMoveCountToSwap(void)
     return rename(PATH_SIGNAL_COUNT, PATH_SIGNAL_COUNT_SWAP);
 }
 
+/**
+ * read the whole swap file into memory. If this proves too memory hungry, split into smaller chunks
+ *
+ */
 char * fileGetSwapFileContents(void)
 {
-    return "i am a CSV";
+    char * fileContents;
+    long fileSize;
+    
+    FILE * swapFile = fopen(PATH_SIGNAL_COUNT_SWAP, "rb");
+    
+    // figure out how big this file is
+    fseek(swapFile, 0, SEEK_END);
+    
+    fileSize = ftell(swapFile);
+    
+    rewind(swapFile);
+    
+    // allocate enough memory for the contents of the file
+    fileContents = malloc(fileSize * (sizeof(char)));
+    
+    // load the contents of the file into the fileContents var
+    fread(fileContents, sizeof(char), fileSize, swapFile);
+    
+    fclose(swapFile);
+    
+    return fileContents;
 }
 
 char * getMacAddress()

@@ -21,7 +21,7 @@
 #include <wiringPi.h>
 #include <time.h>
 #include <unistd.h>
-//#include <curl/curl.h>
+#include <curl/curl.h>
 
 // what GPIO input pin are we using? (wiringPi pin number)
 #define	PIN_INPUT 0
@@ -41,12 +41,15 @@
 // number of seconds to debounce input signal for
 #define DEBOUNCE_INTERVAL_MS 200
 
+// where the signal count CSV string will be posted to
+#define END_POINT_URL "http://dispatch.john.dev.graze.com/signal-count/record-box-formed-csv"
+
 
 // Stores the previous interrupt time, used for debouncing
 static unsigned long long interruptTimePrevious;
 
 // are currently submitting the signal count?
-static unsigned int isSubmittingSignalCount = -1;
+static int isProcessingCountFile = -1;
 
 /**
  * record the signal count to CSV file
@@ -97,7 +100,7 @@ int fileRecordSignalCount(void)
     
     fclose(filePointerCount);
     
-    printf("file was recorded\n");
+    printf("signal was recorded to file\n");
     
     return 0;
 }
@@ -117,6 +120,11 @@ int fileMoveCountToSwap(void)
     return rename(PATH_SIGNAL_COUNT, PATH_SIGNAL_COUNT_SWAP);
 }
 
+char * fileGetSwapFileContents(void)
+{
+    return "i am a CSV";
+}
+
 char * getMacAddress()
 {
     // @todo implement this
@@ -129,7 +137,42 @@ char * getMacAddress()
  */
 int requestPostCsv(csv)
 {
-    //@todo implement this
+    // init
+    curl_global_init(CURL_GLOBAL_ALL);
+    
+    CURL * curl;
+    
+    //get a curl handle
+    curl = curl_easy_init();
+
+    if(curl) {
+        // set the end point
+        curl_easy_setopt(curl, CURLOPT_URL, END_POINT_URL);
+        
+        char * postString = NULL;
+        asprintf(&postString, "csv=%s&macAddress=%s", fileGetSwapFileContents(), getMacAddress());
+        
+        // specify post data
+        curl_easy_setopt(curl, CURLOPT_POSTFIELDS, postString);
+
+        // make the request
+        CURLcode res;
+        
+        res = curl_easy_perform(curl);
+        
+        if(res != CURLE_OK) {
+            fprintf(stderr, "curl_easy_perform() failed: %s\n", curl_easy_strerror(res));
+        }
+        else {
+            printf("request made\n");
+        }
+        
+        // clean up
+        curl_easy_cleanup(curl);
+    }
+    
+    curl_global_cleanup();
+    return 0;
 }
 
 /**
@@ -151,24 +194,25 @@ PI_THREAD(ledSignalCounted)
     ledBlink(DEBOUNCE_INTERVAL_MS);
 }
 
-void submitSignalCount ()
+PI_THREAD(processCountFile)
 {
     // are we already processing something
-    if(isSubmittingSignalCount > -1) {
+    if(isProcessingCountFile > -1) {
+        printf("something is already being processed\n");
         return;
     }
     
-    isSubmittingSignalCount = 0;
+    isProcessingCountFile = 0;
     
     // does a swap already exist?
     // this will normally be false, unless something crashed / lost power
     // before it was submitted in a previous run
     if(fileSwapFileExists() < 0) {
-        // is there anything to process?
+        // no swap file. Is there anything to process?
         if(fileCountFileExists() < 0) {
             printf("nothing to process\n");
             // nothing to process
-            isSubmittingSignalCount = -1;
+            isProcessingCountFile = -1;
             return;
         }
         else {
@@ -179,7 +223,7 @@ void submitSignalCount ()
         if(fileMoveCountToSwap() < 0) {
             // something went wrong
             // @todo log the error
-            isSubmittingSignalCount = -1;
+            isProcessingCountFile = -1;
             return;
         }
     }
@@ -188,10 +232,9 @@ void submitSignalCount ()
     }
     
     // submit the contents of the file
-    // @todo do that ^
-    printf("submitting the file, or some isht\n");
+    requestPostCsv();
     
-    isSubmittingSignalCount = -1;
+    isProcessingCountFile = -1;
 }
 
 /**
@@ -221,29 +264,8 @@ void signalIsr (void)
     // blink the LED to show we recorded the signal
     piThreadCreate(ledSignalCounted);
     
-    // submit the signal count
-    submitSignalCount();
-}
-
-PI_THREAD(recordSignalCount)
-{
-    // do we have a file that's waiting to be recorded?
-    if(fileSwapFileExists() < 1) {
-        // no, have there been any new signal counts?
-        if(fileCountFileExists() > 0) {
-            // yep, there have been more counts, create a 'record file'
-            fileMoveCountToSwap();
-        }
-    }
-    
-    // do we have a record file now?
-    if(fileSwapFileExists() < 1) {
-        // nope
-        return;
-    }
-    
-    // yes we do. Try and send it
-    //requestSubmitCsv();
+    // attempt to submit the count file
+    piThreadCreate(processCountFile);
 }
 
 /**
@@ -277,6 +299,8 @@ int main (void)
     ledBlink(300);
     delay(300);
     ledBlink(300);
+    
+    printf("signalCount started\n");
     
     for(;;) {
         delay(2000);

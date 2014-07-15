@@ -126,31 +126,35 @@ int fileMoveCountToSwap(void)
  * read the whole swap file into memory. If this proves too memory hungry, split into smaller chunks
  *
  */
-char * fileGetFileContents(char * fileName)
+char * fileGetFileContents(char * filename)
 {
     char * fileContents;
     long fileSize;
-    
-    FILE * swapFile = fopen(fileName, "rb");
-    
-    // figure out how big this file is
-    fseek(swapFile, 0, SEEK_END);
-    
-    fileSize = ftell(swapFile);
-    
-    rewind(swapFile);
-    
-    // allocate enough memory for the contents of the file
-    fileContents = malloc((fileSize + 1) * (sizeof(char)));
-    
+
+    FILE * fileHandle = fopen(filename, "rb");
+
+    // move file pointer to the end of the file
+    fseek(fileHandle, 0, SEEK_END);
+
+    // the position of the file pointer now
+    fileSize = ftell(fileHandle);
+
+    printf("file size: %lu bytes\n", fileSize);
+
+    // move the pointer back to the start of the file
+    rewind(fileHandle);
+
+    // allocate memory, include an extra byte for null terminate char
+    fileContents = malloc(fileSize + 1);
+
     // load the contents of the file into the fileContents var
-    fread(fileContents, sizeof(char), fileSize, swapFile);
-    
-    fclose(swapFile);
-    
+    fread(fileContents, fileSize, 1, fileHandle);
+
+    fclose(fileHandle);
+
     // null terminate
     fileContents[fileSize] = 0;
-    
+
     return fileContents;
 }
 
@@ -168,12 +172,14 @@ char * fileGetMacAddress(void)
  * Submit (via HTTP POST) the CSV to an endpoint
  * Based on the example from here: http://curl.haxx.se/libcurl/c/http-post.html
  */
-int requestPostCsv(csv)
+int requestPostCsv()
 {
     // init
     curl_global_init(CURL_GLOBAL_ALL);
     
     CURL * curl;
+    
+    int returnValue = 0;
     
     //get a curl handle
     curl = curl_easy_init();
@@ -184,6 +190,8 @@ int requestPostCsv(csv)
         
         char * postString = NULL;
         asprintf(&postString, "csv=%s&macAddress=%s", fileGetSwapFileContents(), fileGetMacAddress());
+        
+        printf("combined string is this: %s\n", postString);
         
         // specify post data
         curl_easy_setopt(curl, CURLOPT_POSTFIELDS, postString);
@@ -202,9 +210,7 @@ int requestPostCsv(csv)
         
         if(res != CURLE_OK) {
             fprintf(stderr, "curl_easy_perform() failed: %s\n", curl_easy_strerror(res));
-        }
-        else {
-            printf("request made\n");
+            returnValue = -1;
         }
         
         // clean up
@@ -212,7 +218,8 @@ int requestPostCsv(csv)
     }
     
     curl_global_cleanup();
-    return 0;
+    
+    return returnValue;
 }
 
 /**
@@ -262,9 +269,12 @@ PI_THREAD(processCountFile)
         // move the count file to the swap file
         if(fileMoveCountToSwap() < 0) {
             // something went wrong
-            // @todo log the error
+            printf("could not move count to swap\n");
             isProcessingCountFile = -1;
             return;
+        }
+        else {
+            printf("moved count file to swap\n");
         }
     }
     else {
@@ -272,7 +282,17 @@ PI_THREAD(processCountFile)
     }
     
     // submit the contents of the file
-    requestPostCsv();
+    if(requestPostCsv() < 0) {
+        //submit failed, @todo log
+        isProcessingCountFile = -1;
+        return;
+    }
+    
+    // successfully recorded, delete the swap file
+    if(remove(PATH_SIGNAL_COUNT_SWAP) < 0) {
+        printf("failed to delete swap\n");
+        //@todo record this properly
+    }
     
     isProcessingCountFile = -1;
 }

@@ -72,7 +72,7 @@ int fileRecordSignalCount(void)
     
     len = strlen(characterArray);
     
-    // replace the last char with '0' if it's '/', for some reason
+    // remove last \n char - null terminate
     if(characterArray[len - 1] == '/') {
         characterArray[len - 1] = 0;
     }
@@ -129,9 +129,11 @@ int fileMoveCountToSwap(void)
 char * fileGetFileContents(char * filename)
 {
     char * fileContents;
-    long fileSize;
-
-    FILE * fileHandle = fopen(filename, "rb");
+    unsigned long fileSize;
+    unsigned int bytesRead;
+    FILE * fileHandle;
+    
+    fileHandle = fopen(filename, "rb");
 
     // move file pointer to the end of the file
     fseek(fileHandle, 0, SEEK_END);
@@ -148,12 +150,16 @@ char * fileGetFileContents(char * filename)
     fileContents = malloc(fileSize + 1);
 
     // load the contents of the file into the fileContents var
-    fread(fileContents, fileSize, 1, fileHandle);
+    bytesRead = fread(fileContents, 1, fileSize, fileHandle);
 
     fclose(fileHandle);
 
     // null terminate
-    fileContents[fileSize] = 0;
+    // @gotcha - null terminate at bytes read, not fileSize bytes. For non-real (OS) files,
+    // a block (4096bytes) is returned
+    fileContents[bytesRead] = 0;
+    
+    printf("file contents was this: %s\n", fileContents);
 
     return fileContents;
 }
@@ -172,13 +178,13 @@ char * fileGetMacAddress(void)
  * Submit (via HTTP POST) the CSV to an endpoint
  * Based on the example from here: http://curl.haxx.se/libcurl/c/http-post.html
  */
-int requestPostCsv()
+int requestPostCsv(macAddress, csv)
 {
     // init
     curl_global_init(CURL_GLOBAL_ALL);
-    
     CURL * curl;
-    
+    char * postString;
+    FILE *devNull;
     int returnValue = 0;
     
     //get a curl handle
@@ -188,8 +194,7 @@ int requestPostCsv()
         // set the end point
         curl_easy_setopt(curl, CURLOPT_URL, END_POINT_URL);
         
-        char * postString = NULL;
-        asprintf(&postString, "csv=%s&macAddress=%s", fileGetSwapFileContents(), fileGetMacAddress());
+        asprintf(&postString, "macAddress=%s&csv=%s", macAddress, csv);
         
         printf("combined string is this: %s\n", postString);
         
@@ -197,7 +202,7 @@ int requestPostCsv()
         curl_easy_setopt(curl, CURLOPT_POSTFIELDS, postString);
         
         // send response body to /dev/null
-        FILE *devNull = fopen("/dev/null", "w+");
+        devNull = fopen("/dev/null", "w+");
         
         curl_easy_setopt(curl, CURLOPT_WRITEDATA, devNull);
 
@@ -282,7 +287,7 @@ PI_THREAD(processCountFile)
     }
     
     // submit the contents of the file
-    if(requestPostCsv() < 0) {
+    if(requestPostCsv(fileGetMacAddress(), fileGetSwapFileContents()) < 0) {
         //submit failed, @todo log
         isProcessingCountFile = -1;
         return;

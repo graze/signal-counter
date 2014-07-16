@@ -48,7 +48,7 @@
 
 
 // Stores the previous interrupt time, used for debouncing
-static unsigned long long interruptTimePrevious;
+static unsigned long long interruptTimeMsPrevious;
 
 // are currently submitting the signal count?
 static int isProcessingCountFile = -1;
@@ -56,7 +56,8 @@ static int isProcessingCountFile = -1;
 /**
  * record the signal count to CSV file
  */
-int fileRecordSignalCount(void)
+
+int fileRecordSignalCount(unsigned long long interruptTimeMs)
 {
     // try and create the directory structure
     // init a string - can hold up to 256 chars
@@ -98,7 +99,7 @@ int fileRecordSignalCount(void)
         return -1;
     }
     
-    fprintf(filePointerCount, "%lld\n", time(NULL));
+    fprintf(filePointerCount, "%llu\n", interruptTimeMs);
     
     fclose(filePointerCount);
     
@@ -308,24 +309,23 @@ PI_THREAD(processCountFile)
 void signalIsr (void)
 {
     struct timeval tv;
-    
+
     gettimeofday(&tv, NULL);
-    
-    // seconds to since epoch to ms + microseconds since epoch to ms = ms since epoch
-    unsigned long long interruptTime =
+
+    unsigned long long interruptTimeMs =
         (unsigned long long)(tv.tv_sec) * 1000 +
         (unsigned long long)(tv.tv_usec) / 1000;
     
-    if( (interruptTime - interruptTimePrevious) < DEBOUNCE_INTERVAL_MS) {
+    if( (interruptTimeMs - interruptTimeMsPrevious) < DEBOUNCE_INTERVAL_MS) {
         // assume this is just jitter, ignore the IRQ
         //printf("ignoring, this is jitter\n");
         return;
     }
     
-    interruptTimePrevious = interruptTime;
+    interruptTimeMsPrevious = interruptTimeMs;
     
     // record the signal count to file
-    fileRecordSignalCount();
+    fileRecordSignalCount(interruptTimeMs);
     
     // blink the LED to show we recorded the signal
     piThreadCreate(ledSignalCounted);

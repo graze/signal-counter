@@ -41,10 +41,10 @@
 #define PATH_MAC_ADDRESS_ETH0 "/sys/class/net/eth0/address"
 
 // number of seconds to debounce input signal for
-#define DEBOUNCE_INTERVAL_MS 200
+#define DEBOUNCE_INTERVAL_MS 1000
 
 // where the signal count CSV string will be posted to
-#define END_POINT_URL "http://dispatch.john.dev.graze.com/signal-count/record-box-formed-csv"
+#define END_POINT_URL "http://dispatch/uk/box-form/record-signal-counter-csv"
 
 
 // Stores the previous interrupt time, used for debouncing
@@ -318,6 +318,7 @@ void signalIsr (void)
     
     if( (interruptTime - interruptTimePrevious) < DEBOUNCE_INTERVAL_MS) {
         // assume this is just jitter, ignore the IRQ
+        //printf("ignoring, this is jitter\n");
         return;
     }
     

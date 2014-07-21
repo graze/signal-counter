@@ -364,8 +364,10 @@ int main (void)
     // configure the output pin for output. Output output output
     pinMode(PIN_OUTPUT, OUTPUT);
     
-    // create a thread to watch for new signal count files
-    //piThreadCreate(recordSignalCount);
+    pinMode(PIN_INPUT, INPUT);
+    
+    // pull the internal logic gate down to 0v - we don't want it floating around
+    pullUpDnControl(PIN_INPUT, PUD_DOWN);
     
     // blink 3 times - we're ready to go
     ledBlink(300);

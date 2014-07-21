@@ -29,9 +29,6 @@
 // LED to indicate activity
 #define PIN_OUTPUT 2
 
-// the amount of time between recording results (main execution loop interval)
-#define RECORD_INTERVAL_MS 1000
-
 // each time a signal is requested, a timestamp is recorded here
 #define PATH_SIGNAL_COUNT "/var/lib/signalCounter/count"
 
@@ -40,15 +37,13 @@
 
 #define PATH_MAC_ADDRESS_ETH0 "/sys/class/net/eth0/address"
 
-// number of seconds to debounce input signal for
-#define DEBOUNCE_INTERVAL_MS 1000
+// number of seconds we want signal for before counting as an actual hit
+#define TRIGGER_INTERVAL_MS 300
 
 // where the signal count CSV string will be posted to
 #define END_POINT_URL "http://dispatch/uk/box-form/record-signal-counter-csv"
 
-
-// Stores the previous interrupt time, used for debouncing
-static unsigned long long interruptTimeMsPrevious;
+static unsigned long long interruptTimeMsRising = 0;
 
 // are currently submitting the signal count?
 static int isProcessingCountFile = -1;
@@ -244,7 +239,7 @@ void ledBlink(int durationMs)
  */
 PI_THREAD(ledSignalCounted)
 {
-    ledBlink(DEBOUNCE_INTERVAL_MS);
+    ledBlink(300);
 }
 
 PI_THREAD(processCountFile)
@@ -316,21 +311,33 @@ void signalIsr (void)
         (unsigned long long)(tv.tv_sec) * 1000 +
         (unsigned long long)(tv.tv_usec) / 1000;
     
-    if( (interruptTimeMs - interruptTimeMsPrevious) < DEBOUNCE_INTERVAL_MS) {
-        // assume this is just jitter, ignore the IRQ
-        printf("ignoring, this is jitter\n");
+    // determine whether this is rising edge or falling edge
+    if(digitalRead(PIN_INPUT) == 1) {
+        // rising edge
+        interruptTimeMsRising = interruptTimeMs;
         return;
     }
     
-    // deal with noise. Is the pin still "on" after a delay?
-    delay(200);
-    
-    if(digitalRead(PIN_INPUT) == 0) {
-        printf("probably some noise, ignoring\n");
+    // Was there a preceding rising edge detected?
+    if(interruptTimeMsRising == 0) {
+        // No rising value, ignore
         return;
     }
     
-    interruptTimeMsPrevious = interruptTimeMs;
+    // else, falling edge
+    unsigned long long intervalTimeMs = interruptTimeMs - interruptTimeMsRising;
+    
+    // reset, ready for next event
+    interruptTimeMsRising = 0;
+
+    printf("interval was %llu\n", intervalTimeMs);
+
+    if( intervalTimeMs < TRIGGER_INTERVAL_MS) {
+        printf("ignoring, signal time was not long enough\n");
+        return;
+    }
+    
+    printf("interrupt time was long enough\n");
     
     // record the signal count to file
     fileRecordSignalCount(interruptTimeMs);
@@ -355,7 +362,7 @@ int main (void)
     }
     
     // set up an interrupt on our input pin
-    if (wiringPiISR(PIN_INPUT, INT_EDGE_RISING, &signalIsr) < 0)
+    if (wiringPiISR(PIN_INPUT, INT_EDGE_BOTH, &signalIsr) < 0)
     {
         fprintf(stderr, "Unable to setup ISR: %s\n", strerror (errno));
         return 1 ;
@@ -380,6 +387,10 @@ int main (void)
     
     for(;;) {
         delay(2000);
+        
+        // this thread will submit any count files that have not been sent
+        //printf("about to run cleanup thread\n");
+        //piThreadCreate(processCountFile);
     }
 
     return 0;

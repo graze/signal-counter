@@ -318,7 +318,15 @@ void signalIsr (void)
     
     if( (interruptTimeMs - interruptTimeMsPrevious) < DEBOUNCE_INTERVAL_MS) {
         // assume this is just jitter, ignore the IRQ
-        //printf("ignoring, this is jitter\n");
+        printf("ignoring, this is jitter\n");
+        return;
+    }
+    
+    // deal with noise. Is the pin still "on" after a delay?
+    delay(200);
+    
+    if(digitalRead(PIN_INPUT) == 0) {
+        printf("probably some noise, ignoring\n");
         return;
     }
     
@@ -347,7 +355,7 @@ int main (void)
     }
     
     // set up an interrupt on our input pin
-    if (wiringPiISR (PIN_INPUT, INT_EDGE_FALLING, &signalIsr) < 0)
+    if (wiringPiISR(PIN_INPUT, INT_EDGE_RISING, &signalIsr) < 0)
     {
         fprintf(stderr, "Unable to setup ISR: %s\n", strerror (errno));
         return 1 ;

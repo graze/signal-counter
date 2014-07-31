@@ -51,7 +51,6 @@ static int isProcessingCountFile = -1;
 /**
  * record the signal count to CSV file
  */
-
 int fileRecordSignalCount(unsigned long long interruptTimeMs)
 {
     // try and create the directory structure
@@ -68,7 +67,7 @@ int fileRecordSignalCount(unsigned long long interruptTimeMs)
     
     len = strlen(characterArray);
     
-    // remove last \n char - null terminate
+    // remove last \n char and null terminate
     if(characterArray[len - 1] == '/') {
         characterArray[len - 1] = 0;
     }
@@ -94,7 +93,8 @@ int fileRecordSignalCount(unsigned long long interruptTimeMs)
         return -1;
     }
     
-    fprintf(filePointerCount, "%llu\n", interruptTimeMs);
+    // convert ms to s
+    fprintf(filePointerCount, "%llu\n", (interruptTimeMs / 1000));
     
     fclose(filePointerCount);
     

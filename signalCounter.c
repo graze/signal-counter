@@ -176,50 +176,59 @@ char * fileGetMacAddress(void)
  */
 int requestPostCsv(macAddress, csv)
 {
-    // init
-    curl_global_init(CURL_GLOBAL_ALL);
     CURL * curl;
     char * postString;
-    FILE *devNull;
+    FILE * devNull;
+    char * csvUrlEncoded;
     int returnValue = 0;
-    
+
+    // init
+    curl_global_init(CURL_GLOBAL_ALL);
+
     //get a curl handle
     curl = curl_easy_init();
 
     if(curl) {
         // set the end point
         curl_easy_setopt(curl, CURLOPT_URL, END_POINT_URL);
-        
-        asprintf(&postString, "macAddress=%s&csv=%s", macAddress, csv);
-        
+
+        // url encode, to keep newline chars
+        csvUrlEncoded = (char*) curl_easy_escape(curl, (char*) csv, 0);
+
+        asprintf(&postString, "macAddress=%s&csv=%s", macAddress, csvUrlEncoded);
+
         printf("combined string is this: %s\n", postString);
-        
+
         // specify post data
         curl_easy_setopt(curl, CURLOPT_POSTFIELDS, postString);
-        
+
         // send response body to /dev/null
         devNull = fopen("/dev/null", "w+");
-        
+
         curl_easy_setopt(curl, CURLOPT_WRITEDATA, devNull);
 
         // make the request
         CURLcode res;
-        
+
         res = curl_easy_perform(curl);
-        
+
         fclose(devNull);
-        
+
         if(res != CURLE_OK) {
             fprintf(stderr, "curl_easy_perform() failed: %s\n", curl_easy_strerror(res));
             returnValue = -1;
         }
-        
+
         // clean up
+        free(postString);
+
+        curl_free(csvUrlEncoded);
+
         curl_easy_cleanup(curl);
     }
-    
+
     curl_global_cleanup();
-    
+
     return returnValue;
 }
 

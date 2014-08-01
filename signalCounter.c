@@ -54,13 +54,11 @@ static int isProcessingCountFile = -1;
 int fileRecordSignalCount(unsigned long long interruptTimeMs)
 {
     // try and create the directory structure
-    // init a string - can hold up to 256 chars
     char characterArray[256];
-    
-    // init the 'character pointer' for the above string
     char * p;
     p = NULL;
     size_t len;
+    FILE * filePointerCount;
     
     // convert the string to a 'character array'
     snprintf(characterArray, sizeof(characterArray), "%s", PATH_SIGNAL_COUNT);
@@ -82,8 +80,6 @@ int fileRecordSignalCount(unsigned long long interruptTimeMs)
             * p = '/';
         }
     }
-    
-    FILE * filePointerCount;
     
     // create/open existing file for append
     filePointerCount = fopen(PATH_SIGNAL_COUNT, "a");
@@ -175,7 +171,7 @@ char * fileGetMacAddress(void)
  * Based on the example from here: http://curl.haxx.se/libcurl/c/http-post.html
  */
 int requestPostCsv(macAddress, csv)
-{
+{    
     CURL * curl;
     char * postString;
     FILE * devNull;
@@ -253,6 +249,8 @@ PI_THREAD(ledSignalCounted)
 
 PI_THREAD(processCountFile)
 {
+    printf("processCountFile started\n");
+    
     // are we already processing something
     if(isProcessingCountFile > -1) {
         printf("something is already being processed\n");
@@ -291,8 +289,16 @@ PI_THREAD(processCountFile)
         printf("swap file already exists\n");
     }
     
+    char * macAddress = fileGetMacAddress();
+    char * csv = fileGetSwapFileContents();
+    
+    int requestPostCsvSuccess = requestPostCsv(macAddress, csv);
+    
+    free(macAddress);
+    free(csv);
+    
     // submit the contents of the file
-    if(requestPostCsv(fileGetMacAddress(), fileGetSwapFileContents()) < 0) {
+    if(requestPostCsvSuccess < 0) {
         //submit failed, @todo log
         isProcessingCountFile = -1;
         return;
@@ -305,6 +311,8 @@ PI_THREAD(processCountFile)
     }
     
     isProcessingCountFile = -1;
+    printf("processCountFile finished\n");
+    return;
 }
 
 /**

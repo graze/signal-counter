@@ -243,16 +243,8 @@ PI_THREAD(ledSignalCounted)
     ledBlink(300);
 }
 
-PI_THREAD(processCountFile)
+PI_THREAD(processCountFileThread)
 {
-    printf("processCountFile started\n");
-    
-    // are we already processing something
-    if(isProcessingCountFile > -1) {
-        printf("something is already being processed\n");
-        return;
-    }
-    
     isProcessingCountFile = 0;
     
     // does a swap already exist?
@@ -309,6 +301,20 @@ PI_THREAD(processCountFile)
     isProcessingCountFile = -1;
     printf("processCountFileThread ended\n");
     return;
+}
+
+void processCountFile(void)
+{
+    // are we already processing something?
+    if(isProcessingCountFile > -1) {
+        printf("something is already being processed\n");
+        return;
+    }
+    
+    // prevent the thread starting multiple times
+    isProcessingCountFile = 0;
+    
+    piThreadCreate(processCountFileThread);
 }
 
 /**
@@ -401,7 +407,7 @@ int main(void)
         
         // this thread will submit any count files that have not been sent
         //printf("about to run cleanup thread\n");
-        //piThreadCreate(processCountFile);
+        //processCountFile();
     }
 
     return 0;

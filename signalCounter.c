@@ -133,8 +133,6 @@ char * fileGetFileContents(char * filename)
     // the position of the file pointer now
     fileSize = ftell(fileHandle);
 
-    printf("file size: %lu bytes\n", fileSize);
-
     // move the pointer back to the start of the file
     rewind(fileHandle);
 
@@ -150,8 +148,6 @@ char * fileGetFileContents(char * filename)
     // @gotcha - null terminate at bytes read, not fileSize bytes. For non-real (OS) files,
     // a block (4096bytes) is returned
     fileContents[bytesRead] = 0;
-    
-    printf("file contents was this: %s\n", fileContents);
 
     return fileContents;
 }
@@ -170,7 +166,7 @@ char * fileGetMacAddress(void)
  * Submit (via HTTP POST) the CSV to an endpoint
  * Based on the example from here: http://curl.haxx.se/libcurl/c/http-post.html
  */
-int requestPostCsv(macAddress, csv)
+int requestPostCsv(char * macAddress, char * csv)
 {    
     CURL * curl;
     char * postString;
@@ -189,7 +185,7 @@ int requestPostCsv(macAddress, csv)
         curl_easy_setopt(curl, CURLOPT_URL, END_POINT_URL);
 
         // url encode, to keep newline chars
-        csvUrlEncoded = (char*) curl_easy_escape(curl, (char*) csv, 0);
+        csvUrlEncoded = (char*) curl_easy_escape(curl, csv, 0);
 
         asprintf(&postString, "macAddress=%s&csv=%s", macAddress, csvUrlEncoded);
 
@@ -311,14 +307,14 @@ PI_THREAD(processCountFile)
     }
     
     isProcessingCountFile = -1;
-    printf("processCountFile finished\n");
+    printf("processCountFileThread ended\n");
     return;
 }
 
 /**
  * the interrupt to fire when the input pin is pulled up to 3v
  */
-void signalIsr (void)
+void signalIsr(void)
 {
     struct timeval tv;
 
@@ -347,29 +343,27 @@ void signalIsr (void)
     // reset, ready for next event
     interruptTimeMsRising = 0;
 
-    printf("interval was %llu\n", intervalTimeMs);
+    printf("\n\nnew signal - interval was %llu\n", intervalTimeMs);
 
     if( intervalTimeMs < TRIGGER_INTERVAL_MS) {
         printf("ignoring, signal time was not long enough\n");
         return;
     }
     
-    printf("interrupt time was long enough\n");
-    
     // record the signal count to file
     fileRecordSignalCount(interruptTimeMs);
     
     // blink the LED to show we recorded the signal
-    piThreadCreate(ledSignalCounted);
+    //piThreadCreate(ledSignalCounted);
     
     // attempt to submit the count file
-    piThreadCreate(processCountFile);
+    processCountFile();
 }
 
 /**
  * init and run the application
  */
-int main (void)
+int main(void)
 {
     // init the wiringPi library
     if (wiringPiSetup () < 0)

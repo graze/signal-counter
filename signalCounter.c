@@ -18,6 +18,7 @@
 #include <string.h>
 #include <errno.h>
 #include <stdlib.h>
+#include <stdbool.h>
 #include <wiringPi.h>
 #include <time.h>
 #include <unistd.h>
@@ -46,7 +47,7 @@
 static unsigned long long interruptTimeMsRising = 0;
 
 // are currently submitting the signal count?
-static int isProcessingCountFile = -1;
+static bool isProcessingCountFile = false;
 
 /**
  * record the signal count to CSV file
@@ -235,17 +236,23 @@ void ledBlink(int durationMs)
 }
 
 /**
- * blink LED for use with wiringPi threading interface.
- * LED will be on for the duration of debouncing interval
+ * blink LED for use with wiringPi threading interface
  */
 PI_THREAD(ledSignalCounted)
 {
     ledBlink(300);
 }
 
-PI_THREAD(processCountFileThread)
+void processCountFile(void)
 {
-    isProcessingCountFile = 0;
+    // are we already processing something?
+    if(isProcessingCountFile) {
+        printf("something is already being processed\n");
+        return;
+    }
+    
+    // prevent the thread starting multiple times
+    isProcessingCountFile = true;
     
     // does a swap already exist?
     // this will normally be false, unless something crashed / lost power
@@ -255,7 +262,7 @@ PI_THREAD(processCountFileThread)
         if(fileCountFileExists() < 0) {
             printf("nothing to process\n");
             // nothing to process
-            isProcessingCountFile = -1;
+            isProcessingCountFile = false;
             return;
         }
         else {
@@ -266,7 +273,7 @@ PI_THREAD(processCountFileThread)
         if(fileMoveCountToSwap() < 0) {
             // something went wrong
             printf("could not move count to swap\n");
-            isProcessingCountFile = -1;
+            isProcessingCountFile = false;
             return;
         }
         else {
@@ -288,7 +295,7 @@ PI_THREAD(processCountFileThread)
     // submit the contents of the file
     if(requestPostCsvSuccess < 0) {
         //submit failed, @todo log
-        isProcessingCountFile = -1;
+        isProcessingCountFile = false;
         return;
     }
     
@@ -298,23 +305,9 @@ PI_THREAD(processCountFileThread)
         //@todo record this properly
     }
     
-    isProcessingCountFile = -1;
-    printf("processCountFileThread ended\n");
+    isProcessingCountFile = false;
+    printf("processCountFile ended\n");
     return;
-}
-
-void processCountFile(void)
-{
-    // are we already processing something?
-    if(isProcessingCountFile > -1) {
-        printf("something is already being processed\n");
-        return;
-    }
-    
-    // prevent the thread starting multiple times
-    isProcessingCountFile = 0;
-    
-    piThreadCreate(processCountFileThread);
 }
 
 /**
@@ -363,7 +356,8 @@ void signalIsr(void)
     //piThreadCreate(ledSignalCounted);
     
     // attempt to submit the count file
-    processCountFile();
+    // disable - threads become unresponsive after a while. Rely on main loop call to processCountFile();
+    //processCountFile();
 }
 
 /**
@@ -403,11 +397,11 @@ int main(void)
     printf("signalCount started\n");
     
     for(;;) {
-        delay(2000);
+        delay(1000);
         
         // this thread will submit any count files that have not been sent
-        //printf("about to run cleanup thread\n");
-        //processCountFile();
+        printf("about to run cleanup thread\n");
+        processCountFile();
     }
 
     return 0;

@@ -354,6 +354,7 @@ void signalIsr(void)
     
     // blink the LED to show we recorded the signal
     //piThreadCreate(ledSignalCounted);
+    ledBlink(200);
     
     // attempt to submit the count file
     // disable - threads become unresponsive after a while. Rely on main loop call to processCountFile();

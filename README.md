@@ -28,6 +28,13 @@ Try this:
 
 `gcc -o signalCounter signalCounter.c -lwiringPi -lcurl`
 
+##Starting the program on boot##
+Move the compiled program somewhere sensible, like `/usr/local/bin/signalCounter` (or create a symlink), and add the following line to `/etc/rc.local`:
+
+`/usr/local/bin/signalCounter > /dev/null  2>&1 &`
+
+This will run signalCounter in the background, redirecting output from stdout and stderr to `/dev/null`. If you want to log output from the application, replace `/dev/null` with a file of your choice.
+
 ### License
 The content of this library is released under the **MIT License** by
 **Nature Delivered Ltd.**.<br/> You can find a copy of this license at http://opensource.org/licenses/mit.

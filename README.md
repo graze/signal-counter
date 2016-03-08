@@ -10,7 +10,7 @@ Each time a signal is detected, the current timestamp is written to a file in CS
 
 A request might look like:
 
-`macAddress=b8:27:eb:b5:c6:b4&csv=1406212693\n1406212720\n1406212775`
+`macAddress=b8:27:eb:b5:c6:b4&csv=1406212693%0A1406212720%0A1406212775`
 
 ###Network Resilience###
 

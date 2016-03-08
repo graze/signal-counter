@@ -1,4 +1,4 @@
-signalCounter
+signal-counter
 =============
 
 Embedded Raspberry Pi system for counting and recording input signals on the GPIO header, submitting them via HTTP.
@@ -17,7 +17,7 @@ A request might look like:
 The application will continue recording hits to file, even without a network connection. A thread periodically check's for a CSV that has yet to be submitted and attempts to POST it.
 
 ##Dependencies##
-signalCounter requires the wiringPi library and libcurl
+signal-counter requires the wiringPi library and libcurl
 
 https://github.com/WiringPi/WiringPi
 
@@ -27,6 +27,13 @@ http://curl.haxx.se/libcurl/
 Try this:
 
 `gcc -o signalCounter signalCounter.c -lwiringPi -lcurl`
+
+##Starting the program on boot##
+Move the compiled program somewhere sensible, like `/usr/local/bin/signalCounter` (or create a symlink), and add the following line to `/etc/rc.local`:
+
+`/usr/local/bin/signalCounter > /dev/null  2>&1 &`
+
+This will run signal-counter in the background, redirecting output from stdout and stderr to `/dev/null`. If you want to log output from the application, replace `/dev/null` with a file of your choice.
 
 ### License
 The content of this library is released under the **MIT License** by

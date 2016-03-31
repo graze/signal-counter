@@ -311,17 +311,23 @@ void processCountFile(void)
 }
 
 /**
- * the interrupt to fire when the input pin is pulled up to 3v
+ * get the current timestamp in milliseconds
  */
-void signalIsr(void)
+unsigned long long getCurrentMilliseconds(void)
 {
     struct timeval tv;
 
     gettimeofday(&tv, NULL);
 
-    unsigned long long interruptTimeMs =
-        (unsigned long long)(tv.tv_sec) * 1000 +
-        (unsigned long long)(tv.tv_usec) / 1000;
+    return (unsigned long long)(tv.tv_sec) * 1000 + (unsigned long long)(tv.tv_usec) / 1000;
+}
+
+/**
+ * the interrupt to fire when the input pin is pulled up to 3v
+ */
+void signalIsr(void)
+{
+    unsigned long long interruptTimeMs = getCurrentMilliseconds();
 
     // determine whether this is rising edge or falling edge
     if(digitalRead(PIN_INPUT) == 1) {
@@ -402,6 +408,9 @@ int main(int argc, char *argv[])
     ledBlink(300);
     delay(300);
     ledBlink(300);
+
+    // send a test signal count with the current timestamp
+    fileRecordSignalCount(getCurrentMilliseconds());
 
     printf("signalCount started\n");
 

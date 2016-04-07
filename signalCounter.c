@@ -42,7 +42,7 @@
 #define TRIGGER_INTERVAL_MS 300
 
 // where the signal count CSV string will be posted to
-#define END_POINT_URL "http://dispatch/uk/box-form/record-signal-counter-csv"
+char endPointUrl[1024];
 
 static unsigned long long interruptTimeMsRising = 0;
 
@@ -60,17 +60,17 @@ int fileRecordSignalCount(unsigned long long interruptTimeMs)
     p = NULL;
     size_t len;
     FILE * filePointerCount;
-    
+
     // convert the string to a 'character array'
     snprintf(characterArray, sizeof(characterArray), "%s", PATH_SIGNAL_COUNT);
-    
+
     len = strlen(characterArray);
-    
+
     // remove last \n char and null terminate
     if(characterArray[len - 1] == '/') {
         characterArray[len - 1] = 0;
     }
-    
+
     // loop over each character, via the character pointer
     for(p = characterArray + 1; * p; p++) {
         // break at each '/' and create the dir
@@ -81,22 +81,22 @@ int fileRecordSignalCount(unsigned long long interruptTimeMs)
             * p = '/';
         }
     }
-    
+
     // create/open existing file for append
     filePointerCount = fopen(PATH_SIGNAL_COUNT, "a");
-    
+
     if(filePointerCount == NULL) {
         fprintf(stderr, "Failed to open count file: %s\n", strerror(errno));
         return -1;
     }
-    
+
     // convert ms to s
     fprintf(filePointerCount, "%llu\n", (interruptTimeMs / 1000));
-    
+
     fclose(filePointerCount);
-    
+
     printf("signal was recorded to file\n");
-    
+
     return 0;
 }
 
@@ -125,7 +125,7 @@ char * fileGetFileContents(char * filename)
     unsigned long fileSize;
     unsigned int bytesRead;
     FILE * fileHandle;
-    
+
     fileHandle = fopen(filename, "rb");
 
     // move file pointer to the end of the file
@@ -168,7 +168,7 @@ char * fileGetMacAddress(void)
  * Based on the example from here: http://curl.haxx.se/libcurl/c/http-post.html
  */
 int requestPostCsv(char * macAddress, char * csv)
-{    
+{
     CURL * curl;
     char * postString;
     FILE * devNull;
@@ -183,7 +183,7 @@ int requestPostCsv(char * macAddress, char * csv)
 
     if(curl) {
         // set the end point
-        curl_easy_setopt(curl, CURLOPT_URL, END_POINT_URL);
+        curl_easy_setopt(curl, CURLOPT_URL, endPointUrl);
 
         // url encode, to keep newline chars
         csvUrlEncoded = (char*) curl_easy_escape(curl, csv, 0);
@@ -250,10 +250,10 @@ void processCountFile(void)
         printf("something is already being processed\n");
         return;
     }
-    
+
     // prevent the thread starting multiple times
     isProcessingCountFile = true;
-    
+
     // does a swap already exist?
     // this will normally be false, unless something crashed / lost power
     // before it was submitted in a previous run
@@ -268,7 +268,7 @@ void processCountFile(void)
         else {
             printf("count file exists\n");
         }
-        
+
         // move the count file to the swap file
         if(fileMoveCountToSwap() < 0) {
             // something went wrong
@@ -283,31 +283,43 @@ void processCountFile(void)
     else {
         printf("swap file already exists\n");
     }
-    
+
     char * macAddress = fileGetMacAddress();
     char * csv = fileGetSwapFileContents();
-    
+
     int requestPostCsvSuccess = requestPostCsv(macAddress, csv);
-    
+
     free(macAddress);
     free(csv);
-    
+
     // submit the contents of the file
     if(requestPostCsvSuccess < 0) {
         //submit failed, @todo log
         isProcessingCountFile = false;
         return;
     }
-    
+
     // successfully recorded, delete the swap file
     if(remove(PATH_SIGNAL_COUNT_SWAP) < 0) {
         printf("failed to delete swap\n");
         //@todo record this properly
     }
-    
+
     isProcessingCountFile = false;
     printf("processCountFile ended\n");
     return;
+}
+
+/**
+ * get the current timestamp in milliseconds
+ */
+unsigned long long getCurrentMilliseconds(void)
+{
+    struct timeval tv;
+
+    gettimeofday(&tv, NULL);
+
+    return (unsigned long long)(tv.tv_sec) * 1000 + (unsigned long long)(tv.tv_usec) / 1000;
 }
 
 /**
@@ -315,30 +327,24 @@ void processCountFile(void)
  */
 void signalIsr(void)
 {
-    struct timeval tv;
+    unsigned long long interruptTimeMs = getCurrentMilliseconds();
 
-    gettimeofday(&tv, NULL);
-
-    unsigned long long interruptTimeMs =
-        (unsigned long long)(tv.tv_sec) * 1000 +
-        (unsigned long long)(tv.tv_usec) / 1000;
-    
     // determine whether this is rising edge or falling edge
     if(digitalRead(PIN_INPUT) == 1) {
         // rising edge
         interruptTimeMsRising = interruptTimeMs;
         return;
     }
-    
+
     // Was there a preceding rising edge detected?
     if(interruptTimeMsRising == 0) {
         // No rising value, ignore
         return;
     }
-    
+
     // else, falling edge
     unsigned long long intervalTimeMs = interruptTimeMs - interruptTimeMsRising;
-    
+
     // reset, ready for next event
     interruptTimeMsRising = 0;
 
@@ -348,13 +354,14 @@ void signalIsr(void)
         printf("ignoring, signal time was not long enough\n");
         return;
     }
-    
+
     // record the signal count to file
     fileRecordSignalCount(interruptTimeMs);
-    
+
     // blink the LED to show we recorded the signal
     //piThreadCreate(ledSignalCounted);
-    
+    ledBlink(200);
+
     // attempt to submit the count file
     // disable - threads become unresponsive after a while. Rely on main loop call to processCountFile();
     //processCountFile();
@@ -363,42 +370,53 @@ void signalIsr(void)
 /**
  * init and run the application
  */
-int main(void)
+int main(int argc, char *argv[])
 {
+    if(argc != 2) {
+        printf("signalCounter expects 1 argument to be end point URL\n");
+        return 1;
+    }
+
+    strcpy(endPointUrl, argv[1]);
+    fprintf(stderr, "Using [%s] as endpoint URL\n", endPointUrl);
+
     // init the wiringPi library
     if (wiringPiSetup () < 0)
     {
         fprintf(stderr, "Unable to setup wiringPi: %s\n", strerror (errno));
         return 1 ;
     }
-    
+
     // set up an interrupt on our input pin
     if (wiringPiISR(PIN_INPUT, INT_EDGE_BOTH, &signalIsr) < 0)
     {
         fprintf(stderr, "Unable to setup ISR: %s\n", strerror (errno));
         return 1 ;
     }
-    
+
     // configure the output pin for output. Output output output
     pinMode(PIN_OUTPUT, OUTPUT);
-    
+
     pinMode(PIN_INPUT, INPUT);
-    
+
     // pull the internal logic gate down to 0v - we don't want it floating around
     pullUpDnControl(PIN_INPUT, PUD_DOWN);
-    
+
     // blink 3 times - we're ready to go
     ledBlink(300);
     delay(300);
     ledBlink(300);
     delay(300);
     ledBlink(300);
-    
+
+    // send a test signal count with the current timestamp
+    fileRecordSignalCount(getCurrentMilliseconds());
+
     printf("signalCount started\n");
-    
+
     for(;;) {
         delay(1000);
-        
+
         // this thread will submit any count files that have not been sent
         printf("about to run cleanup thread\n");
         processCountFile();

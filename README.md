@@ -1,3 +1,5 @@
+![banner](https://cloud.githubusercontent.com/assets/1314694/14457766/df8e98bc-00a4-11e6-8936-bba6cd26709f.jpg)
+
 signal-counter
 =============
 

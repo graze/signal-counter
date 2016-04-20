@@ -16,7 +16,7 @@ A request might look like:
 
 ###Network Resilience###
 
-The application will continue recording hits to file, even without a network connection. A thread periodically check's for a CSV that has yet to be submitted and attempts to POST it.
+The application will continue recording hits to file, even without a network connection. A thread periodically checks for a CSV that has yet to be submitted and attempts to POST it.
 
 ##Dependencies##
 signal-counter requires the wiringPi library and libcurl

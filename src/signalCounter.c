@@ -38,15 +38,15 @@
 
 #define PATH_MAC_ADDRESS_ETH0 "/sys/class/net/eth0/address"
 
-// number of seconds we want signal for before counting as an actual hit
-#define TRIGGER_INTERVAL_MS 300
-
 // where the signal count CSV string will be posted to
 char endPointUrl[1024];
 
+// number of seconds we want signal for before counting as an actual hit
+short int triggerInterval = 300;
+
 static unsigned long long interruptTimeMsRising = 0;
 
-// are currently submitting the signal count?
+// are we currently submitting the signal count?
 static bool isProcessingCountFile = false;
 
 /**
@@ -350,7 +350,7 @@ void signalIsr(void)
 
     printf("\n\nnew signal - interval was %llu\n", intervalTimeMs);
 
-    if( intervalTimeMs < TRIGGER_INTERVAL_MS) {
+    if( intervalTimeMs < triggerInterval) {
         printf("ignoring, signal time was not long enough\n");
         return;
     }
@@ -372,13 +372,30 @@ void signalIsr(void)
  */
 int main(int argc, char *argv[])
 {
-    if(argc != 2) {
-        printf("signalCounter expects 1 argument to be end point URL\n");
+    if(argc < 2)
+    {
+        printf("signalCount: usage: signalCounter [endpoint] (trigger_interval_ms)\n");
         return 1;
     }
 
+    // store endpoint
     strcpy(endPointUrl, argv[1]);
-    fprintf(stderr, "Using [%s] as endpoint URL\n", endPointUrl);
+    printf("Using [%s] as endpoint URL\n", endPointUrl);
+
+    // store trigger interval, if we have one
+    if(argc == 3)
+    {
+        char* p; // will be set to the "first invalid character" set by strtol
+        errno = 0;
+        triggerInterval = strtol(argv[2], &p, 10);
+        if (*p != '\0' || errno != 0)
+        {
+            fprintf(stderr, "invalid trigger interval [%s]\n", argv[2]);
+            return 1;
+        }
+    }
+
+    printf("Using [%d] for trigger interval\n", triggerInterval);
 
     // init the wiringPi library
     if (wiringPiSetup () < 0)

@@ -350,7 +350,7 @@ void signalIsr(void)
 
     printf("\n\nnew signal - interval was %llu\n", intervalTimeMs);
 
-    if( intervalTimeMs < triggerInterval) {
+    if(intervalTimeMs < triggerInterval) {
         printf("ignoring, signal time was not long enough\n");
         return;
     }

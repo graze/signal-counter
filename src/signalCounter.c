@@ -34,7 +34,7 @@
 #define PATH_SIGNAL_COUNT "/var/lib/signalCounter/count"
 
 // the count file is moved to here before it is submitted
-#define PATH_SIGNAL_COUNT_SWAP "/tmp/signalCounterCount.swp"
+#define PATH_SIGNAL_COUNT_SWAP "/var/lib/signalCounter/count.swp"
 
 #define PATH_MAC_ADDRESS_ETH0 "/sys/class/net/eth0/address"
 

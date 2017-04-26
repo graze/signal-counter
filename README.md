@@ -1,6 +1,6 @@
 ![banner](https://cloud.githubusercontent.com/assets/1314694/14457766/df8e98bc-00a4-11e6-8936-bba6cd26709f.jpg)
 
-# signal-counter 
+# signal-counter
 
 
 Embedded Raspberry Pi system for counting and recording input signals on the GPIO header, submitting them via HTTP.
@@ -8,7 +8,7 @@ Embedded Raspberry Pi system for counting and recording input signals on the GPI
 Written for recording the output of a 24v PLC light gate sensor, the interface for which can be found here: http://123d.circuits.io/circuits/275120-24v-sensor-input-to-raspberry-pi-gpio
 
 ## Operation
-Each time a signal is detected, the current timestamp is written to a file in CSV format. The application then attempts to POST the contents of the CSV file to an HTTP endpoint. Included in the request is the MAC address of the Raspberry Pi's eth0 interface. This is for identification purposes.
+Each time a signal is detected, the current timestamp is written to a file in CSV format. The application then attempts to POST the contents of the CSV file to an HTTP endpoint. In order to identify the Raspberry Pi, the eth0 MAC address is included in the request.
 
 A request might look like:
 
@@ -18,14 +18,21 @@ A request might look like:
 
 The application will continue recording hits to file, even without a network connection. A thread periodically checks for a CSV that has yet to be submitted and attempts to POST it.
 
-## Dependencies
+## Compiling
 signal-counter requires the wiringPi library and libcurl
 
 - http://wiringpi.com/download-and-install/
 - `sudo apt-get install libcurl4-openssl-dev`
 
-## Compiling
+To compile on a Raspberry Pi, run the following:
+
 `gcc -o signalCounter signalCounter.c -lwiringPi -lcurl`
+
+## Usage
+`signalCounter [endpoint] (trigger_interval_ms)`
+
+- `endpoint` - the HTTP endpoint that recorded signals are POSTed to
+- `trigger_interval_ms` - the number of ms of signal required before a hit is recorded. If no argument is supplied this defaults to 300ms.
 
 ## Starting the program on boot
 Move the compiled program somewhere sensible, like `/usr/local/bin/signalCounter` (or create a symlink), and add the following line to `/etc/rc.local`:

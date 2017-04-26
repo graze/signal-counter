@@ -42,7 +42,7 @@
 char endPointUrl[1024];
 
 // number of ms we want signal for before counting as an actual hit (debouncing)
-short int triggerInterval = 300;
+long int triggerInterval = 300;
 
 static unsigned long long interruptTimeMsRising = 0;
 

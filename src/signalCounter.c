@@ -240,7 +240,7 @@ void ledBlink(int durationMs)
  */
 PI_THREAD(ledSignalCounted)
 {
-    ledBlink(300);
+    ledBlink(50);
 }
 
 void processCountFile(void)
@@ -360,7 +360,7 @@ void signalIsr(void)
 
     // blink the LED to show we recorded the signal
     //piThreadCreate(ledSignalCounted);
-    ledBlink(200);
+    ledBlink(50);
 
     // attempt to submit the count file
     // disable - threads become unresponsive after a while. Rely on main loop call to processCountFile();

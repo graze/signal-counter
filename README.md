@@ -5,7 +5,7 @@
 
 Embedded Raspberry Pi system for counting and recording input signals on the GPIO header, submitting them via HTTP.
 
-Written for recording the output of a 24v PLC light gate sensor, the interface for which can be found here: http://123d.circuits.io/circuits/275120-24v-sensor-input-to-raspberry-pi-gpio
+Written for recording the output of a 24v PLC sensors via a custom made PCB, the schematic for which can be found here: https://circuits.io/circuits/275120-24v-sensor-input-to-raspberry-pi-gpio
 
 ## Operation
 Each time a signal is detected, the current timestamp is written to a file in CSV format. The application then attempts to POST the contents of the CSV file to an HTTP endpoint. In order to identify the Raspberry Pi, the eth0 MAC address is included in the request.
